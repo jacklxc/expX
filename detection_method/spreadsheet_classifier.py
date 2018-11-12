@@ -3,11 +3,6 @@ import re
 
 import numpy as np
 
-import nltk
-nltk.download('stopwords')
-from nltk.corpus import stopwords
-from nltk.tokenize import RegexpTokenizer
-
 import h5py
 
 import tensorflow as tf
@@ -185,9 +180,6 @@ class SpreadsheetData:
             self.test_size = self.y_test.shape[0]
         else:
             self.MAX_NB_WORDS = 600000
-            nltk_tokenizer = RegexpTokenizer(r'\w+')
-            stop_words = set(stopwords.words('english'))
-            stop_words.update(['.', ',', '"', "'", ':', ';', '(', ')', '[', ']', '{', '}'])
 
             raw_docs_train = df_train[textColumn].tolist()
             raw_docs_test = df_test[textColumn].tolist()

@@ -2,11 +2,6 @@ import re
 import glob
 import numpy as np
 
-import nltk
-nltk.download('stopwords')
-from nltk.corpus import stopwords
-from nltk.tokenize import RegexpTokenizer
-
 import h5py
 import pickle
 
@@ -317,9 +312,6 @@ class SpreadsheetData:
         self.max_seq_len = np.round(seq_len.mean() + seq_len.std()).astype(int)
         
         self.MAX_NB_WORDS = MAX_NB_WORDS
-        nltk_tokenizer = RegexpTokenizer(r'\w+')
-        stop_words = set(stopwords.words('english'))
-        stop_words.update(['.', ',', '"', "'", ':', ';', '(', ')', '[', ']', '{', '}'])
 
         raw_docs_train = train_paragraphs
         raw_docs_test = test_paragraphs

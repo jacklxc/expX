@@ -11,8 +11,8 @@ parser.add_argument("--embedding_path", "-e", default=sys.stdin)
 parser.add_argument("--vocab_file", "-v", default=sys.stdin)
 args = parser.parse_args()
 
-runFile = args.embedding_name+"_run.tsv"
-outFile = args.embedding_name+"_performance.tsv"
+runFile = "run/"+args.embedding_name+"_run.tsv"
+outFile = "performance/"+args.embedding_name+"_performance.tsv"
 vocabFile = args.vocab_file
 dataPath = args.data_path
 embeddingPath = args.embedding_path
