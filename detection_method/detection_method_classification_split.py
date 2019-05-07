@@ -1,28 +1,29 @@
 from __future__ import print_function, division
+import sys
 
 from embedding_reader import EmbeddingReader
-from spreadsheet_classifier import reset_random_seed, RunFile, SpreadsheetClassificationExecution, SpreadsheetData
+from spreadsheet_classifier_split import reset_random_seed, RunFile, SpreadsheetClassificationExecution, SpreadsheetData
 import argparse
 from tqdm import tqdm
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--embedding_name", "-n", default=sys.stdin)
-parser.add_argument("--data_file", "-d", default=sys.stdin)
-parser.add_argument("--vocab_file", "-v", default=sys.stdin)
+parser.add_argument("--train_file", "-train", default=sys.stdin)
+parser.add_argument("--dev_file", "-dev", default=sys.stdin)
+parser.add_argument("--test_file", "-test", default=sys.stdin)
 parser.add_argument("--embedding_path", "-e", default=sys.stdin)
 
 args = parser.parse_args()
 
 runFile = "run/"+args.embedding_name+"_run.tsv"
 outFile = "performance/"+args.embedding_name+"_performance.tsv"
-vocabFile = args.vocab_file
-dataFile = args.data_file
+trainFile = args.train_file
+devFile = args.dev_file
+testFile = args.test_file
 embeddingPath = args.embedding_path
 
-testSize = 400
-randomizeTestSet = True
 MAX_NUM_WORDS = 600000
-rf = RunFile(runFile, randomizeTestSet)
+rf = RunFile(runFile)
 repeat = 5
 
 for i, run in enumerate(rf.runs):
@@ -60,11 +61,9 @@ for i, run in enumerate(rf.runs):
         repFile = None
     accuracies = []
     for iteration in range(repeat):
-        if "glove" in embedding_type or "fasttext" in embedding_type:
-            ER = EmbeddingReader(repFile,MAX_NUM_WORDS)
-
-        sd = SpreadsheetData(dataFile, text_column, label_column,
-                             testSize, randomizeTestSet,preComputedEmbedding="PreComputed" in model_name, 
+        ER = EmbeddingReader(repFile,MAX_NUM_WORDS)
+        vocab = set(ER.embeddings_index.keys())
+        sd = SpreadsheetData(trainFile, devFile, testFile, text_column, label_column, vocab,
                              MAX_NUM_WORDS = MAX_NUM_WORDS)
         # embedding matrix
         embedding_matrix = None

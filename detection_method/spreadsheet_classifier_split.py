@@ -38,9 +38,8 @@ def reset_random_seed(seed):
 
 class RunFile:
 
-    def __init__(self, runFile, randomize) :
+    def __init__(self, runFile) :
 
-        self.randomize = randomize
         self.runs = []
         tsv = pd.read_csv(runFile, sep='\t')
         for i, row in tsv.iterrows():
@@ -52,7 +51,6 @@ class RunFile:
             
             if row.get('keras_file',None) is not None:
                 run['keras_file'] = row['keras_file']
-            run['randomize'] = self.randomize
             self.runs.append(run)
 
     def print(self, outFile):
@@ -86,10 +84,6 @@ class SpreadsheetClassificationExecution:
             classifier = FancyConvolutionNetworkClassifier(embedding_matrix, sd.max_seq_len, sd.n_classes)
         elif classifier_type == 'BidirectionalLSTMClassifier':
             classifier = BidirectionalLSTMClassifier(embedding_matrix, sd.max_seq_len, sd.n_classes)
-        elif classifier_type == 'PreComputedBidirectionalLSTMClassifier':
-            batch_size = 16
-            num_epochs = 100
-            classifier = PreComputedBidirectionalLSTMClassifier(sd.n_classes)
         else:
             raise ValueError("Incorrect Classifier Type: %s"%(classifier_type))
 
@@ -97,7 +91,7 @@ class SpreadsheetClassificationExecution:
         print("Begin training")
         #early_stopping = EarlyStopping(patience = 10)
         hist = model.fit(sd.x_train, sd.y_train, batch_size=batch_size,
-                         epochs=num_epochs, validation_split=0.1,
+                         epochs=num_epochs, validation_data=(sd.x_dev, sd.y_dev),
                          shuffle=True, verbose=2)
         
         score = model.evaluate(sd.x_test, sd.y_test, verbose=2)
@@ -107,132 +101,63 @@ class SpreadsheetClassificationExecution:
 
 class SpreadsheetData:
 
-    x_train = None
-    x_test = None
-    n_classes = 0
-    y_train = None
-    y_test = None
-    labels = None
-    word_index = None
-    randomized = False
+    def __init__(self, trainFile, devFile, testFile, textColumn, labelColumn, vocab, MAX_NUM_WORDS = 100000):
+        self.MAX_NB_WORDS = 600000
+        self.vocab = vocab
+        self.textColumn = textColumn
+        self.labelColumn = labelColumn
+        self.x_train, self.y_train = self.read_data(trainFile, train=True)
+        self.x_dev, self.y_dev = self.read_data(devFile)
+        self.x_test, self.y_test = self.read_data(testFile)
 
-    def __init__(self, inFile, textColumn, labelColumn, testSize, randomizeTestSet=False, preComputedEmbedding=False, MAX_NUM_WORDS = 100000):
-        vocabFile="/nas/home/xiangcil/bio_corpus/abstracts/bioVocab50.txt"
+    def read_data(self, inFile, train = False):
         df = pd.read_csv(inFile, sep='\t', header=0, index_col=0,engine='python')
 
         # Remove records with missing data.
-        df = df[pd.notnull(df[textColumn])]
-        n_rec = df.shape[0]
+        df = df[pd.notnull(df[self.textColumn])]
+        labels = df[self.labelColumn].unique().tolist()
+        y_base = [labels.index(i) for i in df[self.labelColumn]]
 
-        if randomizeTestSet :
-            test_ids = sorted(random.sample(range(n_rec), int(testSize)))
-            self.randomized = True
-        else:
-            test_ids = range(int(testSize))
-        train_ids = []
-        for i in range(n_rec):
-            if i not in test_ids:
-                train_ids.append(i)
-
-        df_train = df.iloc[train_ids,:]
-        df_test = df.iloc[test_ids,:]
-
-        labels = df[labelColumn].unique().tolist()
-
-        y_train_base = [labels.index(i) for i in df_train[labelColumn]]
-        y_test_base = [labels.index(i) for i in df_test[labelColumn]]
-
+        if train:
         # analyze word distribution
-        df_train['doc_len'] = df_train[textColumn].apply(lambda words: len(words.split(" ")))
-        self.mean_seq_len = np.round(df_train['doc_len'].mean()).astype(int)
-        self.max_seq_len = np.round(df_train['doc_len'].mean() + df_train['doc_len'].std()).astype(int)
+            df['doc_len'] = df[self.textColumn].apply(lambda words: len(words.split(" ")))
+            self.mean_seq_len = np.round(df['doc_len'].mean()).astype(int)
+            self.max_seq_len = np.round(df['doc_len'].mean() + df['doc_len'].std()).astype(int)
 
         np.random.seed(0)
-        
-        if preComputedEmbedding:
-            if textColumn=="evd_frg":
-                embedding_file = "/nas/home/xiangcil/figure_classification/evidence_fragment.hdf5"
-            elif textColumn=="text":
-                embedding_file = "/nas/home/xiangcil/figure_classification/text.hdf5"
-            else:
-                assert False, "Wrong text column!"
-            self.x_train = np.zeros((len(train_ids),self.max_seq_len,1024*3))
-            self.x_test = np.zeros((len(test_ids),self.max_seq_len,1024*3))
-            self.train_ids = train_ids
-            self.test_ids=test_ids
-            with h5py.File(embedding_file, 'r') as fin:
-                for index,i in tqdm(enumerate(train_ids)):
-                    #matrix = np.max(fin[str(i)][()],axis=0) # Max pooling
-                    matrix = np.concatenate((fin[str(i)][()][0,:,:],fin[str(i)][()][1,:,:],fin[str(i)][()][2,:,:]),axis=1)
-                    sentence_length = np.min([matrix.shape[0],self.max_seq_len])
-                    self.x_train[index,:sentence_length,:] = matrix[:sentence_length,:]
-                for index,i in tqdm(enumerate(test_ids)):
-                    #matrix = np.max(fin[str(i)][()],axis=0)
-                    matrix = np.concatenate((fin[str(i)][()][0,:,:],fin[str(i)][()][1,:,:],fin[str(i)][()][2,:,:]),axis=1)
-                    sentence_length = np.min([matrix.shape[0],self.max_seq_len])
-                    self.x_test[index,:sentence_length,:] = matrix[:sentence_length,:]
-            self.n_classes = len(labels)
-            self.labels = labels
-            self.y_train = keras.utils.to_categorical(y_train_base, num_classes=self.n_classes)
-            self.y_test = keras.utils.to_categorical(y_test_base, num_classes=self.n_classes)
-            self.train_size = self.y_train.shape[0]
-            self.test_size = self.y_test.shape[0]
-        else:
-            self.MAX_NB_WORDS = 600000
 
-            raw_docs_train = df_train[textColumn].tolist()
-            raw_docs_test = df_test[textColumn].tolist()
-            self.raw_docs_train = np.array(raw_docs_train, dtype=str)[:, np.newaxis]
-            self.raw_docs_test = np.array(raw_docs_test, dtype=str)[:, np.newaxis]
+        raw_docs = df[self.textColumn].tolist()
 
-            print("pre-processing train data...")
-            
-            vocab = []
-            with open(vocabFile,"r") as vfile:
-                for line in vfile:
-                    vocab.append(line.strip())
-            self.vocab = set(vocab)
-            
-            processed_docs_train = []
-            for doc in raw_docs_train:
-                filtered = []
-                tokens = doc.split()
-                for word in tokens:
-                    word = self._clean_url(word)
-                    word = self._clean_num(word)
-                    if word not in self.vocab:
-                        word = "<UNK>"
-                    filtered.append(word)
-                processed_docs_train.append(" ".join(filtered))
+        print("pre-processing train data...")        
+        processed_docs = []
+        for doc in raw_docs:
+            filtered = []
+            tokens = doc.split()
+            for word in tokens:
+                word = self._clean_url(word)
+                word = self._clean_num(word)
+                if word not in self.vocab:
+                    word = "<UNK>"
+                filtered.append(word)
+            processed_docs.append(" ".join(filtered))
+        if train:
+            self.tokenizer = Tokenizer(num_words=self.MAX_NB_WORDS, lower=True, char_level=False)
+            self.tokenizer.fit_on_texts(processed_docs)  #leaky
 
-            processed_docs_test = []
-            for doc in raw_docs_test:
-                filtered = []
-                tokens = doc.split()
-                for word in tokens:
-                    word = self._clean_url(word)
-                    word = self._clean_num(word)
-                    if word not in self.vocab:
-                        word = "<UNK>"
-                    filtered.append(word)
-                processed_docs_test.append(" ".join(filtered))
+        print("tokenizing input data...")
+        word_seq_train = self.tokenizer.texts_to_sequences(processed_docs)
 
-            print("tokenizing input data...")
-            tokenizer = Tokenizer(num_words=self.MAX_NB_WORDS, lower=True, char_level=False)
-            tokenizer.fit_on_texts(processed_docs_train + processed_docs_test)  #leaky
-            word_seq_train = tokenizer.texts_to_sequences(processed_docs_train)
-            word_seq_test = tokenizer.texts_to_sequences(processed_docs_test)
-            self.word_index = tokenizer.word_index
+        if train:
+            self.word_index = self.tokenizer.word_index
             print("dictionary size: ", len(self.word_index))
 
-            #pad sequences
-            self.x_train = sequence.pad_sequences(word_seq_train, maxlen=self.max_seq_len)
-            self.x_test = sequence.pad_sequences(word_seq_test, maxlen=self.max_seq_len)
-
+        #pad sequences
+        X = sequence.pad_sequences(word_seq_train, maxlen=self.max_seq_len)
+        if train:
             self.n_classes = len(labels)
             self.labels = labels
-            self.y_train = keras.utils.to_categorical(y_train_base, num_classes=self.n_classes)
-            self.y_test = keras.utils.to_categorical(y_test_base, num_classes=self.n_classes)
+        Y = keras.utils.to_categorical(y_base, num_classes=self.n_classes)
+        return X, Y
 
     def _clean_url(self,word):
         """
@@ -323,18 +248,6 @@ class SuperSimpleLSTMClassifierRandomEmbedding:
                       optimizer='rmsprop',
                       metrics=['accuracy'])
         self.model.summary()        
-
-class PreComputedBidirectionalLSTMClassifier:
-    def __init__(self, n_classes):
-        self.model = Sequential()
-        self.model.add(Dropout(0.25))
-        self.model.add(Bidirectional(LSTM(128,batch_input_shape=(None,None,1024*3))))
-        self.model.add(Dropout(0.5))
-        self.model.add(Dense(n_classes, activation='sigmoid'))
-        self.model.compile(loss='categorical_crossentropy',
-                           optimizer='adam',
-                           metrics=['accuracy'])
-        #self.model.summary()
         
 class SuperSimpleLSTMClassifier:
 
