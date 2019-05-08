@@ -8,23 +8,17 @@ from tqdm import tqdm
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--embedding_name", "-n", default=sys.stdin)
-parser.add_argument("--train_file", "-train", default=sys.stdin)
-parser.add_argument("--dev_file", "-dev", default=sys.stdin)
-parser.add_argument("--test_file", "-test", default=sys.stdin)
 parser.add_argument("--embedding_path", "-e", default=sys.stdin)
 
 args = parser.parse_args()
 
-runFile = "run/"+args.embedding_name+"_run.tsv"
+runFile = "runText/"+args.embedding_name+"_run.tsv"
 outFile = "performance/"+args.embedding_name+"_performance.tsv"
-trainFile = args.train_file
-devFile = args.dev_file
-testFile = args.test_file
 embeddingPath = args.embedding_path
 
 MAX_NUM_WORDS = 600000
 rf = RunFile(runFile)
-repeat = 5
+repeat = 10
 
 for i, run in enumerate(rf.runs):
     reset_random_seed(0)
@@ -59,6 +53,12 @@ for i, run in enumerate(rf.runs):
         repFile = embeddingPath+"wiki.en.vec"  
     else:
         repFile = None
+
+    base_path = "data/filtered_records_new_"
+    trainFile = base_path + label_column + "_train.tsv"
+    devFile = base_path + label_column + "_val.tsv"
+    testFile = base_path + label_column + "_test.tsv"
+
     accuracies = []
     for iteration in range(repeat):
         ER = EmbeddingReader(repFile,MAX_NUM_WORDS)
