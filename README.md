@@ -41,4 +41,5 @@ $ python detection_method_classification.py -n EMBEDDING_NAME -d DATA_FILE -e EM
 `EMBEDDING_PATH` refers to the path that all the pretrained word embeddings are stored.
 `VOCAB_FILE` refers to the file that the vocabulary file that used when training word embeddings.
 
-
+### Note
+The only major difference in _split.py is it takes pre-splitted train, dev, test data, while the original code splits train and test during execution.
