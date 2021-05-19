@@ -1,6 +1,6 @@
 # expX
 Darkspace document classifier & Detection method classifier
-This work is developed by [Xiangci Li](https://github.com/jacklxc) (xiangcil@isi.edu) on top of Dr. Gully Burns's code. Read the [paper]() for more details.
+This work is developed by [Xiangci Li](https://github.com/jacklxc) (lixiangci8@gmail.com) on top of Dr. Gully Burns's code. Read the [paper](https://doi.org/10.1093/database/baz034) for more details.
 ## Requirements
 * Tensorflow (1.9.0)
 * Keras (GPU version, 2.2.2. Non-GPU version should also work.)
@@ -43,3 +43,16 @@ $ python detection_method_classification.py -n EMBEDDING_NAME -d DATA_FILE -e EM
 
 ### Note
 The only major difference in _split.py is it takes pre-splitted train, dev, test data, while the original code splits train and test during execution.
+
+## Cite our paper
+Please use the following BibTeX citation to cite our paper:
+```
+@article{burns2019building,
+  title={Building deep learning models for evidence classification from the open access biomedical literature},
+  author={Burns, Gully A and Li, Xiangci and Peng, Nanyun},
+  journal={Database},
+  volume={2019},
+  year={2019},
+  publisher={Oxford Academic}
+}
+```
